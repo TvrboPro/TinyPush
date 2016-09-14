@@ -97,6 +97,8 @@ function send(pushTokens, message, payload, sound){
 				tokensToUpdate.push({from: result.token, to: result.registration_id});
 			else if(result.error === 'InvalidRegistration' || result.error === 'NotRegistered')
 				tokensToRemove.push(result.token);
+			else if(result.error === 'MismatchSenderId')
+				throw new Error("GCM ERROR: Your Sender ID appears to be invalid");
 
 			// count failures
 			if(result.error) prev.failed++;

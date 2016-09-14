@@ -1,6 +1,6 @@
 {
   "name": "tiny-push",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Delivering push notifications made simple and straightforward",
   "main": "index.js",
   "scripts": {

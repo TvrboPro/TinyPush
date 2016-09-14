@@ -29,5 +29,8 @@
     "bluebird": "^3.4.6",
     "lodash.zip": "^4.2.0",
     "node-gcm": "^0.14.4"
+  },
+  "devDependencies": {
+    "eslint": "^3.5.0"
   }
 }

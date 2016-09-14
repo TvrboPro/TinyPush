@@ -1,4 +1,4 @@
-Promise = require('bluebird');
+var Promise = require('bluebird');
 var gcm = require("node-gcm");
 var zip = require('lodash.zip');
 var gcmConnection;
@@ -6,20 +6,20 @@ var gcmConnection;
 var defaults = {};
 var feedbackHandlers = [];
 
-function init(gcmKey, appName = "App", retryCount = 7, delayWhileIdle = false, simulate = false){
+function init(gcmKey, defaultValues){
 	if(!gcmKey) throw new Error("The provided GCM KEY is empty");
 
-	defaults.appName = appName;
-	defaults.retryCount = retryCount;
-	defaults.delayWhileIdle = delayWhileIdle;
-	defaults.simulate = simulate;
+	defaults.appName = defaultValues.appName || 'App';
+	defaults.retryCount = defaultValues.retryCount || 7;
+	defaults.delayWhileIdle = defaultValues.delayWhileIdle || false;
+	defaults.simulate = defaultValues.simulate || false;
 
 	gcmConnection = new gcm.Sender(gcmKey);
 }
 
 function send(pushTokens, message, payload){
 	if(!gcmConnection)
-		return Promise.reject(new Error("The Android notification system is not defaultsured yet"));
+		return Promise.reject(new Error("The Android notification system is not configured yet"));
 	else if(!pushTokens)
 		return Promise.resolve([]);
 	else if(typeof pushTokens == 'object' && !pushTokens.length)

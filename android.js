@@ -3,16 +3,30 @@ var gcm = require("node-gcm");
 var zip = require('lodash.zip');
 var gcmConnection;
 
-var defaults = {};
-var feedbackHandlers = [];
+var defaults = {
+	appName: 'TinyPush',
+	retryCount: 8,
+	delayWhileIdle: false, // wait till the phone wakes from sleep
+	checkPayloadSize: false, // throws an error if true and size > 2048
+	simulate: false,
+	concurrency: 30
+};
+var handlers = [];
 
-function init(gcmKey, defaultValues){
+
+function init(gcmKey, defaultValues = {}){
 	if(!gcmKey) throw new Error("The provided GCM KEY is empty");
 
-	defaults.appName = defaultValues.appName || 'App';
-	defaults.retryCount = defaultValues.retryCount || 7;
-	defaults.delayWhileIdle = defaultValues.delayWhileIdle || false;
-	defaults.simulate = defaultValues.simulate || false;
+	if(defaultValues.appName)
+		defaults.appName = defaultValues.appName;
+	if(defaultValues.retryCount)
+		defaults.retryCount = defaultValues.retryCount;
+	if(defaultValues.delayWhileIdle)
+		defaults.delayWhileIdle = defaultValues.delayWhileIdle;
+	if(defaultValues.simulate)
+		defaults.simulate = defaultValues.simulate;
+	if(defaultValues.concurrency)
+		defaults.concurrency = defaultValues.concurrency;
 
 	gcmConnection = new gcm.Sender(gcmKey);
 }
@@ -88,7 +102,7 @@ function send(pushTokens, message, payload){
 			return prev;
 		}, {successful: 0, failed: 0});
 
-		feedbackHandlers.forEach(handler => {
+		handlers.forEach(handler => {
 			handler(tokensToUpdate, tokensToRemove);
 		});
 
@@ -96,15 +110,15 @@ function send(pushTokens, message, payload){
 	});
 }
 
-function addFeedbackHandler(handler){
+function onFeedback(handler){
 	if(typeof handler !== 'function')
 		throw new Error("Not a valid function");
 
-	feedbackHandlers.push(handler);
+	handlers.push(handler);
 }
 
 module.exports = {
-    init: init,
-    send: send,
-    addFeedbackHandler: addFeedbackHandler
-}
+  init: init,
+  send: send,
+  onFeedback: onFeedback
+};

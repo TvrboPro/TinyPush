@@ -4,21 +4,27 @@ var Promise = require('bluebird');
 var zip = require('lodash.zip');
 
 var defaults = {
-	timeToLive: 60 * 60 * 24 * 2 // 48h
+	timeToLive: 60 * 60 * 24 * 2, // 48h
+	concurrency: 30
 };
 var apnConnection;
 var apnFeedback;
 
-var feedbackHandlers = [];
+var handlers = {
+	feedback: []
+};
 
-function init(certFile, keyFile, production, defaultValues){
-	if(!certFile) throw new Error("The provided APN certificate file is empty");
-	else if(!keyFile) throw new Error("The provided APN key file is empty");
+function init(certFile, keyFile, production, defaultValues = {}){
+	if(!certFile) throw new Error("An APN certificate file is needed");
+	else if(!keyFile) throw new Error("An APN key file is needed");
 	else if(!fs.existsSync(certFile)) throw new Error("The provided APN certificate file does not exist");
 	else if(!fs.existsSync(keyFile)) throw new Error("The provided APN key file does not exist");
 
 	if(defaultValues.timetoLive)
 		defaults.timetoLive = Math.max(defaultValues.timetoLive, 60 * 60); // min 1h
+
+	if(defaultValues.concurrency)
+		defaults.concurrency = defaultValues.concurrency;
 
 	var apnConfig = {
 		// buffersNotifications:true,
@@ -37,13 +43,13 @@ function init(certFile, keyFile, production, defaultValues){
 	};
 
 	apnConnection = new apn.Connection(apnConfig);
-	apnConnection.on('transmissionError', onTransmissionError);
+	apnConnection.on('transmissionError', onApnTransmissionError);
 
 	apnFeedback = new apn.Feedback(feedbackConfig)
-	apnFeedback.on('feedback', onFeedback);
+	apnFeedback.on('feedback', onApnFeedback);
 }
 
-function send(pushTokens, message, payload, timeToLive, unreadCounters, sound){
+function send(pushTokens, message, payload, unreadBadges, sound, timeToLive){
 	if(!pushTokens)
 		return Promise.resolve([]);
 	else if(typeof pushTokens == 'object' && !pushTokens.length)
@@ -51,36 +57,36 @@ function send(pushTokens, message, payload, timeToLive, unreadCounters, sound){
 
 	// a single push token
 	if(typeof pushTokens == 'string') {
-		if(typeof unreadCounters == 'number')
-			return sendOne(pushTokens, message, payload, timeToLive, unreadCounters || 0, sound);
-		else if(typeof unreadCounters == 'object')
-			return sendOne(pushTokens, message, payload, timeToLive, unreadCounters[0] || 0, sound);
+		if(typeof unreadBadges == 'number')
+			return sendOne(pushTokens, message, payload, unreadBadges || 0, sound, timeToLive);
+		else if(typeof unreadBadges == 'object')
+			return sendOne(pushTokens, message, payload, unreadBadges[0] || 0, sound, timeToLive);
 		else
-			return sendOne(pushTokens, message, payload, timeToLive, 0, sound);
+			return sendOne(pushTokens, message, payload, 0, sound, timeToLive);
 	}
 	// many push tokens
 	else if(typeof pushTokens == 'object') {
-		if(typeof unreadCounters == 'number') { // same unread counter for all
+		if(typeof unreadBadges == 'number') { // same unread counter for all
 			return Promise.map(pushTokens, pushToken => {
-				return sendOne(pushToken, message, payload, timeToLive, unreadCounters || 0, sound);
-			});
+				return sendOne(pushToken, message, payload, unreadBadges || 0, sound, timeToLive);
+			}, {concurrency: defaults.concurrency});
 		}
-		else if(typeof unreadCounters == 'object') { // each push token with its unread counter
-			let tuples = zip(pushTokens, unreadCounters);
+		else if(typeof unreadBadges == 'object') { // each push token with its unread counter
+			let tuples = zip(pushTokens, unreadBadges);
 
 			return Promise.map(tuples, tuple => {
-				return sendOne(tuple[0], message, payload, timeToLive, tuple[1] || 0, sound);
-			});
+				return sendOne(tuple[0], message, payload, tuple[1] || 0, sound, timeToLive);
+			}, {concurrency: defaults.concurrency});
 		}
 		else
-			return sendOne(pushTokens, message, payload, timeToLive, 0, sound);
+			return sendOne(pushTokens, message, payload, 0, sound, timeToLive);
 	}
 	// Invalid parameters
 	else
 		return Promise.reject(new Error("The first parameter must be a push token or an array of push tokens. Got", pushTokens));
 }
 
-function sendOne(pushToken, message, payload, timeToLive, unreadCounter, sound){
+function sendOne(pushToken, message, payload, unreadBadge, sound, timeToLive){
 	if(!apnConnection)
 		return Promise.reject(new Error("The APN notification system is not configured yet"));
 
@@ -99,7 +105,7 @@ function sendOne(pushToken, message, payload, timeToLive, unreadCounter, sound){
 		if(sound) // default if not
 			notification.sound = sound; // "www/push.caf";
 
-		notification.badge = unreadCounter || 0;
+		notification.badge = unreadBadge || 0;
 		notification.truncateAtWordEnd = true;
 
 		notification.alert = message || "";
@@ -108,44 +114,49 @@ function sendOne(pushToken, message, payload, timeToLive, unreadCounter, sound){
 		// payload
 		notification.payload = payload || {};
 
+		if(JSON.stringify(notification).length >= 4096)
+			throw new Error("The total payload size exceeds the allowed amount");
+
 		apnConnection.pushNotification(notification, device);
 	});
 }
 
-function addFeedbackHandler(handler){
-	if(typeof handler !== 'function') throw new Error("Not a valid function");
+// subscribers
+function onFeedback(handler){
+	if(typeof handler !== 'function')
+		throw new Error("Not a valid function");
 
-	feedbackHandlers.push(handler);
+	handlers.push(handler);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 // HELPERS
 ///////////////////////////////////////////////////////////////////////////////
 
-function onFeedback(deviceInfos) {
+function onApnFeedback(deviceInfos) {
 	if (deviceInfos.length == 0) return;
 	var tokensToRemove = deviceInfos.map(deviceInfo => deviceInfo.device.token.toString('hex') );
 
-	feedbackHandlers.forEach(function(handler){
-		handler([/* no tokens to update */], tokensToRemove);
+	handlers.feedback.forEach(handler => {
+		handler([/* no tokens to update on APN */], tokensToRemove);
 	});
 }
 
-function onTransmissionError(errorCode, notification, recipient) {
+function onApnTransmissionError(errorCode, notification, recipient) {
 	// Invalid token => remove device
   if(errorCode === 8 && recipient.token) {
     var token = recipient.token.toString('hex');
 
-    feedbackHandlers.forEach(function(handler){
-			handler([/* no tokens to update */], [token]);
+    handlers.feedback.forEach(handler => {
+			handler([/* no tokens to update on APN */], [token]);
 		});
   }
 }
 
 
 module.exports = {
-    init: init,
-    send: send,
-    sendOne: sendOne,
-    addFeedbackHandler: addFeedbackHandler
-}
+  init: init,
+  send: send,
+  sendOne: sendOne,
+  onFeedback: onFeedback
+};

@@ -1,0 +1,33 @@
+{
+  "name": "tiny-push",
+  "version": "1.0.0",
+  "description": "Delivering push notifications made simple and straightforward",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TvrboPro/TinyPush.git"
+  },
+  "keywords": [
+    "push",
+    "notifications",
+    "notification",
+    "android",
+    "ios",
+    "iphone"
+  ],
+  "author": "Jordi Moraleda <jordi@tvrbo.pro>",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/TvrboPro/TinyPush/issues"
+  },
+  "homepage": "https://github.com/TvrboPro/TinyPush#readme",
+  "dependencies": {
+    "apn": "^1.7.8",
+    "bluebird": "^3.4.6",
+    "lodash.zip": "^4.2.0",
+    "node-gcm": "^0.14.4"
+  }
+}

@@ -9,7 +9,8 @@ var defaults = {
 	delayWhileIdle: false, // wait till the phone wakes from sleep
 	checkPayloadSize: false, // throws an error if true and size > 2048
 	simulate: false,
-	concurrency: 30
+	concurrency: 50,
+	sound: 'default'
 };
 var handlers = [];
 
@@ -27,11 +28,13 @@ function init(gcmKey, defaultValues = {}){
 		defaults.simulate = defaultValues.simulate;
 	if(defaultValues.concurrency)
 		defaults.concurrency = defaultValues.concurrency;
+	if(defaultValues.androidSound)
+		defaults.sound = defaultValues.androidSound;
 
 	gcmConnection = new gcm.Sender(gcmKey);
 }
 
-function send(pushTokens, message, payload){
+function send(pushTokens, message, payload, sound){
 	if(!gcmConnection)
 		return Promise.reject(new Error("The Android notification system is not configured yet"));
 	else if(!pushTokens)
@@ -55,7 +58,7 @@ function send(pushTokens, message, payload){
 				title: defaults.appName,
 				body: message,
 				icon: "ic_launcher",
-				sound: 'default'
+				sound: sound || defaults.sound
 			},
 			data: payload || {}
 		};

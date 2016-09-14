@@ -5,14 +5,13 @@ var zip = require('lodash.zip');
 
 var defaults = {
 	timeToLive: 60 * 60 * 24 * 2, // 48h
-	concurrency: 30
+	concurrency: 50,
+	sound: 'default'  // default ios sound
 };
 var apnConnection;
 var apnFeedback;
 
-var handlers = {
-	feedback: []
-};
+var handlers = [];
 
 function init(certFile, keyFile, production, defaultValues = {}){
 	if(!certFile) throw new Error("An APN certificate file is needed");
@@ -22,9 +21,10 @@ function init(certFile, keyFile, production, defaultValues = {}){
 
 	if(defaultValues.timetoLive)
 		defaults.timetoLive = Math.max(defaultValues.timetoLive, 60 * 60); // min 1h
-
 	if(defaultValues.concurrency)
 		defaults.concurrency = defaultValues.concurrency;
+	if(defaultValues.iosSound)
+		defaults.sound = defaultValues.iosSound;
 
 	var apnConfig = {
 		// buffersNotifications:true,
@@ -47,6 +47,9 @@ function init(certFile, keyFile, production, defaultValues = {}){
 
 	apnFeedback = new apn.Feedback(feedbackConfig)
 	apnFeedback.on('feedback', onApnFeedback);
+
+	if(!production)
+		console.log((new Date()).toJSON(), "| The APN client is running in SandBox Mode");
 }
 
 function send(pushTokens, message, payload, unreadBadges, sound, timeToLive){
@@ -102,8 +105,12 @@ function sendOne(pushToken, message, payload, unreadBadge, sound, timeToLive){
 		else
 			notification.expiry = Math.floor(Date.now() / 1000) + defaults.timetoLive;  // 48h
 
+
+		// TODO SOUND
 		if(sound) // default if not
 			notification.sound = sound; // "www/push.caf";
+		else
+			notification.sound = defaults.sound;
 
 		notification.badge = unreadBadge || 0;
 		notification.truncateAtWordEnd = true;
@@ -137,20 +144,23 @@ function onApnFeedback(deviceInfos) {
 	if (deviceInfos.length == 0) return;
 	var tokensToRemove = deviceInfos.map(deviceInfo => deviceInfo.device.token.toString('hex') );
 
-	handlers.feedback.forEach(handler => {
+	handlers.forEach(handler => {
 		handler([/* no tokens to update on APN */], tokensToRemove);
 	});
 }
 
 function onApnTransmissionError(errorCode, notification, recipient) {
+
 	// Invalid token => remove device
-  if(errorCode === 8 && recipient.token) {
+  if(errorCode === 8 && recipient && recipient.token) {
     var token = recipient.token.toString('hex');
 
-    handlers.feedback.forEach(handler => {
+    handlers.forEach(handler => {
 			handler([/* no tokens to update on APN */], [token]);
 		});
   }
+  else
+		console.error((new Date()).toJSON(), "| APN transaction error:", errorCode, notification, recipient);
 }
 
 

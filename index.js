@@ -4,12 +4,8 @@ var androidPush = require('./android');
 var iosPush = require('./ios');
 
 var defaults = {
-	concurrency: 30
+	concurrency: 50
 };
-
-
-// androidPush.onFeedback(onDeviceError);
-// iosPush.onFeedback(onDeviceError);
 
 function init(keys = {}, defaultValues = {}){
 	if(defaultValues.concurrency)
@@ -24,20 +20,21 @@ function init(keys = {}, defaultValues = {}){
 
 // recipients => [{token: "...", platform: "ios", unread: 3}, ...]
 
-function batch(recipients, message, payload, timeToLive, sound){
+function batch(recipients, message, payload){
 	return Promise.map(recipients, recipient => {
 			if(!recipient) return;
+			let newPayload = Object.assign({}, payload);
 
 			switch(recipient.platform){
 				case 'android':
 				case 'Android':
-					return androidPush.send(recipient.token, message, payload);
+					return androidPush.send(recipient.token, message, newPayload);
 
 				case 'iphone':
 				case 'iPhone':
 				case 'ios':
 				case 'iOS':
-					return iosPush.sendOne(recipient.token, message, payload, recipient.unread, sound);
+					return iosPush.sendOne(recipient.token, message, newPayload, recipient.unread);
 
 				default:
 					throw new Error('The recipient\'s platform is not supported:', recipient.platform);

@@ -47,6 +47,12 @@ function send(pushTokens, message, payload, sound){
 	if(typeof pushTokens == 'string') {
 		pushTokens = [ pushTokens ];
 	}
+	if(!payload.msgcnt) {
+		payload.msgcnt = '0';
+	}
+	if(!payload.message) {
+		payload.message = message || "";
+	}
 
 	return new Promise((resolve, reject) => {
 		var msg = {

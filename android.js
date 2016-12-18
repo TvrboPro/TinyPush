@@ -47,11 +47,14 @@ function send(pushTokens, message, payload, sound){
 	if(typeof pushTokens == 'string') {
 		pushTokens = [ pushTokens ];
 	}
-	if(!payload.msgcnt) {
+	if(typeof payload.msgcnt == 'undefined') {
 		payload.msgcnt = '0';
 	}
-	if(!payload.message) {
+	if(typeof payload.message == 'undefined') {
 		payload.message = message || "";
+	}
+	if(typeof payload['content-available'] == 'undefined') {
+		payload['content-available'] = '1';
 	}
 
 	return new Promise((resolve, reject) => {

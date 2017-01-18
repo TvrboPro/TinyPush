@@ -1,7 +1,7 @@
 var Promise = require('bluebird');
 
-var androidPush = require('./android');
-var iosPush = require('./ios');
+var gcmPush = require('./android');
+var apnPush = require('./ios');
 
 var defaults = {
 	concurrency: 50
@@ -12,8 +12,8 @@ function init(keys = {}, defaultValues = {}){
 		defaults.concurrency = defaultValues.concurrency;
 
 	// platforms
-	androidPush.init(keys.gcmKey, defaultValues);
-	iosPush.init(keys.apnCertFile, keys.apnKeyFile, keys.production, defaultValues);
+	gcmPush.init(keys.gcmKey, defaultValues);
+	apnPush.init(keys.apnCertFile, keys.apnKeyFile, keys.production, defaultValues);
 
 	console.log((new Date()).toJSON(), "| The push notifications service is set up");
 }
@@ -28,13 +28,13 @@ function batch(recipients, message, payload){
 			switch(recipient.platform){
 				case 'android':
 				case 'Android':
-					return androidPush.send(recipient.token, message, newPayload);
+					return gcmPush.send(recipient.token, message, newPayload);
 
 				case 'iphone':
 				case 'iPhone':
 				case 'ios':
 				case 'iOS':
-					return iosPush.sendOne(recipient.token, message, newPayload, recipient.unread);
+					return apnPush.sendOne(recipient.token, message, newPayload, recipient.unread);
 
 				default:
 					throw new Error('The recipient\'s platform is not supported:', recipient.platform);
@@ -46,11 +46,11 @@ module.exports = {
 	init,
 	batch,
 	android: {
-		send: androidPush.send,
-		onFeedback: androidPush.onFeedback
+		send: gcmPush.send,
+		onFeedback: gcmPush.onFeedback
 	},
 	ios: {
-		send: iosPush.send,
-		onFeedback: iosPush.onFeedback
+		send: apnPush.send,
+		onFeedback: apnPush.onFeedback
 	}
 };

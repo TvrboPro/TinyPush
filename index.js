@@ -43,6 +43,25 @@ function batch(recipients, message, payload){
 		let newPayload = Object.assign({}, payload);
 
 		switch(recipient.platform){
+			// by platform
+
+			case 'fcm':
+			case 'FCM':
+				if(useFCM) return fcmPush.send(recipient.token, message, newPayload);
+				else break;
+
+			case 'gcm':
+			case 'GCM':
+				if(useGCM) return gcmPush.send(recipient.token, message, newPayload);
+				else break;
+
+			case 'apn':
+			case 'APN':
+				if(useAPN) return apnPush.sendOne(recipient.token, message, newPayload, recipient.unread);
+				else break;
+
+			// by arquitechture
+
 			case 'android':
 			case 'Android':
 				if(useFCM)
@@ -58,10 +77,12 @@ function batch(recipients, message, payload){
 			case 'iOS':
 				if(useAPN)
 					return apnPush.sendOne(recipient.token, message, newPayload, recipient.unread);
+				else if(useFCM)
+					return fcmPush.send(recipient.token, message, newPayload);
 				else
 					break;
 		}
-		throw new Error('The recipient\'s platform is not supported:', recipient.platform);
+		throw new Error('The recipient\'s platform is not enabled:', recipient.platform);
 
 	}, {concurrency: defaults.concurrency});
 }

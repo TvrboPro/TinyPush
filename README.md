@@ -17,6 +17,7 @@ To start the push engine, provide the GCM and APN keys:
 var push = require('tiny-push');
 
 const keys = {
+	fcmKey: "__YOUR_FCM_KEY_HERE__",
 	gcmKey: "__YOUR_GCM_KEY_HERE__",
 	apnCertFile: "/path/to/apn.p12",
 	apnKeyFile: "/path/to/apn-key.p12",  // both may be in the same file
@@ -27,7 +28,11 @@ push.init(keys);
 
 ```
 
-The `keys` argument is required. 
+The `keys` argument is required.
+
+If a FCM key is provided, all Android notifications will use FCM. If no FCM key is provided, but a GCM one, then GCM will be used for Android devices. 
+
+If a certificate file is provided, APN will be used on iOS devices. If no certificate is provided and an FCM key is defined, then the delivery will be attempted through FCM.
 
 To override the default values, call the init function as follows: 
 
@@ -35,6 +40,7 @@ To override the default values, call the init function as follows:
 var push = require('tiny-push');
 
 const keys = {
+	fcmKey: "__YOUR_FCM_KEY_HERE__",
 	gcmKey: "__YOUR_GCM_KEY_HERE__",
 	apnCertFile: "/path/to/apn.p12",
 	apnKeyFile: "/path/to/apn-key.p12",  // both may be in the same file
@@ -59,7 +65,6 @@ const defaults = {
 push.init(keys, defaults);
 
 ```
-
 
 The `defaults` parameter is optional. The values above are already the default ones. 
 
@@ -109,7 +114,7 @@ const message = "Hi from TinyPush";
 const payload = { some: "value" };
 const androidSound: 'id_launch';
 
-push.android.send(tokens, message, payload, androidSound)
+push.fcm.send(tokens, message, payload, androidSound)
 .then(res => {
 	console.log(res); // would log: [ { successful: 1, failed: 0 } ]
 })
@@ -129,7 +134,7 @@ const payload = { some: "value" };
 const iosSound: 'ic_launcher';
 const timeToLive = 60 * 60 * 24; // 1 day
 
-push.ios.send(tokens, message, payload, badges, iosSound, timeToLive)
+push.apn.send(tokens, message, payload, badges, iosSound, timeToLive)
 .then(() => {
 	// Going here means that nothing went wrong
 })
@@ -174,8 +179,8 @@ function gotFeedback(tokensToUpdate, tokensToRemove){
 Now you can register your function as a callback:
 
 ```
-push.android.onFeedback(gotFeedback);
-push.ios.onFeedback(gotFeedback);
+push.gcm.onFeedback(gotFeedback);
+push.apn.onFeedback(gotFeedback);
 ```
 **NOTE:** Apple may eventually give some **false positives** of tokens to remove. You may want to double check a user's registration token before you decide to remove it from the database. 
 

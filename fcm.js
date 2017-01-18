@@ -37,18 +37,21 @@ function send(pushTokens, message, payload, sound){
 		return Promise.resolve([]);
 	else if(pushTokens.length > 1000)
 		return Promise.reject(new Error("The amount of recipients exceeds the maximum allowed on FCM (1000)"));
+	else if(typeof pushTokens == 'string') {
+		pushTokens = [ pushTokens ];
+	}
 
 	return new Promise((resolve, reject) => {
 		var msg = {
 			delayWhileIdle: defaults.delayWhileIdle,
-			collapseKey: message || "(no message)", // group identical
+			collapse_key: message || "(no message)", // group identical
 			content_available: true,   // wake IOS app
 			priority: 'normal',
-			timeToLive: 60 * 60 * 24 * 7 * 2, // 2 weeks
+			time_to_live: 60 * 60 * 24 * 7 * 2, // 2 weeks
 			dryRun: defaults.simulate
 		};
-		if(typeof pushTokens == 'string') {
-			msg.to = pushTokens;
+		if(pushTokens.length < 2) {
+			msg.to = pushTokens[0];
 		}
 		else {
 			msg.registration_ids = pushTokens;
@@ -66,7 +69,7 @@ function send(pushTokens, message, payload, sound){
 		}
 
 		// delivery
-		fcmConnection.send(msg, (err, result) => {
+		return fcmConnection.send(msg, (err, result) => {
 			if(err) return reject(err || `The android notification to ${pushTokens} did not complete`);
 
 			// RESULT (in case of error)
@@ -82,7 +85,7 @@ function send(pushTokens, message, payload, sound){
 		});
 	})
 	.then(response => {
-		if(!response) return;
+		if(!response) return [];
 
 		// regrouping like [ [resultObj1, tokenStr1], [resultObj2, tokenStr2], ... ]
 		const groupedResults = zip(response.results, pushTokens);

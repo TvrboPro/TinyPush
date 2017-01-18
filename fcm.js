@@ -65,7 +65,7 @@ function send(pushTokens, message, payload, sound){
 			}
 		}
 		if(payload){
-			msg.data = payload;
+			msg.data = { data: payload };
 		}
 
 		// delivery

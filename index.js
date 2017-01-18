@@ -12,7 +12,7 @@ var defaults = {
 	concurrency: 50
 };
 
-function init({fcmKey, gcmKey, apnCertFile, apnKeyFile, apnProduction}, defaultValues = {}){
+function init({fcmKey, gcmKey, apnKeyFile, apnKeyId, apnTeamId, apnProduction}, defaultValues = {}){
 	if(defaultValues.concurrency)
 		defaults.concurrency = defaultValues.concurrency;
 
@@ -27,8 +27,8 @@ function init({fcmKey, gcmKey, apnCertFile, apnKeyFile, apnProduction}, defaultV
 		useGCM = true;
 	}
 
-	if(apnCertFile && apnKeyFile) {
-		apnPush.init(apnCertFile, apnKeyFile, apnProduction, defaultValues);
+	if(apnKeyFile && apnKeyId && apnTeamId) {
+		apnPush.init({apnKeyFile, apnKeyId, apnTeamId, apnProduction}, defaultValues);
 		useAPN = true;
 	}
 

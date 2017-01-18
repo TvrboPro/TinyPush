@@ -26,7 +26,7 @@
   },
   "homepage": "https://github.com/TvrboPro/TinyPush#readme",
   "dependencies": {
-    "apn": "^1.7.8",
+    "apn": "^2.1.2",
     "bluebird": "^3.4.6",
     "fcm-node": "^1.0.16",
     "lodash.zip": "^4.2.0",

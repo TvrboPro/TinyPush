@@ -8,44 +8,33 @@ var defaults = {
 	concurrency: 50,
 	sound: 'default'  // default ios sound
 };
-var apnConnection;
-var apnFeedback;
-
+var apnProvider;
 var handlers = [];
 
-function init(certFile, keyFile, production, {timetoLive, concurrency, iosSound}){
-	if(!certFile) throw new Error("An APN certificate file is needed");
-	else if(!keyFile) throw new Error("An APN key file is needed");
-	else if(!fs.existsSync(certFile)) throw new Error("The provided APN certificate file does not exist");
-	else if(!fs.existsSync(keyFile)) throw new Error("The provided APN key file does not exist");
+function init({apnKeyFile, apnKeyId, apnTeamId, apnProduction}, {timetoLive, concurrency, iosSound}){
+	if(!apnKeyFile) throw new Error("An APN key file is needed");
+	else if(!apnKeyId) throw new Error("An APN key ID is needed");
+	else if(!apnTeamId) throw new Error("An APN team ID is needed");
+	else if(!fs.existsSync(apnKeyFile)) throw new Error("The provided APN certificate file does not exist");
 
 	if(timetoLive) defaults.timetoLive = Math.max(timetoLive, 60 * 60); // min 1h
 	if(concurrency) defaults.concurrency = concurrency;
 	if(iosSound) defaults.sound = iosSound;
 
 	var apnConfig = {
-		// buffersNotifications:true,
-		fastMode: true,
-		cert: certFile,
-		key: keyFile,
-		production: production
+		token: {
+			key: apnKeyFile,
+			keyId: apnKeyId,
+			teamId: apnTeamId
+		},
+		production: apnProduction,
+		fastMode: true
+		// buffersNotifications:true
 	};
 
-	var feedbackConfig = {
-		cert: certFile,
-		key: keyFile,
-		production: production,
-		batchFeedback: true,
-		interval: 300
-	};
+	apnProvider = new apn.Provider(apnConfig);
 
-	apnConnection = new apn.Connection(apnConfig);
-	apnConnection.on('transmissionError', onApnTransmissionError);
-
-	apnFeedback = new apn.Feedback(feedbackConfig)
-	apnFeedback.on('feedback', onApnFeedback);
-
-	if(!production)
+	if(!apnProduction)
 		console.log((new Date()).toJSON(), "| The APN client is running in SandBox Mode");
 }
 
@@ -87,15 +76,15 @@ function send(pushTokens, message, payload, unreadBadges, sound, timeToLive){
 }
 
 function sendOne(pushToken, message, payload, unreadBadge, sound, timeToLive){
-	if(!apnConnection)
+	if(!apnProvider)
 		return Promise.reject(new Error("The APN notification system is not configured yet"));
 
 	return Promise.try(function(){
 		if(!pushToken) throw new Error("The provided push token is empty");
 		else if(typeof pushToken != 'string') throw new Error("The push token must be a string. Got", pushToken);
 
-		var device = new apn.Device(pushToken);
 		var notification = new apn.Notification();
+		notification.topic = 'com.twins-app.app';
 
 		if(timeToLive)
 			notification.expiry = Math.floor(Date.now() / 1000) + Math.max(timeToLive, 60 * 60); // min 1h
@@ -105,7 +94,7 @@ function sendOne(pushToken, message, payload, unreadBadge, sound, timeToLive){
 
 		// TODO SOUND
 		if(sound) // default if not
-			notification.sound = sound; // "www/push.caf";
+			notification.sound = sound; // "www/push.caf";  'ping.aiff'
 		else
 			notification.sound = defaults.sound;
 
@@ -121,7 +110,19 @@ function sendOne(pushToken, message, payload, unreadBadge, sound, timeToLive){
 		if(JSON.stringify(notification).length >= 4096)
 			throw new Error("The total payload size exceeds the allowed amount");
 
-		apnConnection.pushNotification(notification, device);
+		return new Promise(function(resolve, reject){
+			apnProvider.send(notification, pushToken).then(function(result) {
+				if(!result) resolve({successful: 0, failed: 0});
+				else if(result && result.sent && result.sent.length){
+					resolve({successful: 1, failed: 0});
+				}
+				else if(result && result.failed && result.failed.length){
+					resolve({successful: 0, failed: 1});
+					onApnInvalidToken(result.failed.map(f => f.device));
+				}
+				else resolve({successful: 0, failed: 0});
+			});
+		});
 	});
 }
 
@@ -137,27 +138,12 @@ function onFeedback(handler){
 // HELPERS
 ///////////////////////////////////////////////////////////////////////////////
 
-function onApnFeedback(deviceInfos) {
-	if (deviceInfos.length == 0) return;
-	var tokensToRemove = deviceInfos.map(deviceInfo => deviceInfo.device.token.toString('hex') );
-
-	handlers.forEach(handler => {
-		handler([/* no tokens to update on APN */], tokensToRemove);
-	});
-}
-
-function onApnTransmissionError(errorCode, notification, recipient) {
-
-	// Invalid token => remove device
-  if(errorCode === 8 && recipient && recipient.token) {
-    var token = recipient.token.toString('hex');
-
-    handlers.forEach(handler => {
-			handler([/* no tokens to update on APN */], [token]);
+function onApnInvalidToken(tokens){
+	setImmediate(function(){
+		handlers.forEach(handler => {
+			handler([/* no tokens to update on APN */], tokens);
 		});
-  }
-  else
-		console.error((new Date()).toJSON(), "| APN transaction error:", errorCode, notification, recipient);
+	});
 }
 
 

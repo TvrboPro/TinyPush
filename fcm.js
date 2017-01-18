@@ -70,7 +70,16 @@ function send(pushTokens, message, payload, sound){
 
 		// delivery
 		return fcmConnection.send(msg, (err, result) => {
-			if(err) return reject(err || `The android notification to ${pushTokens} did not complete`);
+			if(err && typeof err == 'string' && err[0] == '{') {
+				try {
+					resolve(JSON.parse(err));
+				}
+				catch(e){
+					return reject(err || `The android notification to ${pushTokens} did not complete`);
+				}
+			}
+			else if(err)
+				return reject(err || `The android notification to ${pushTokens} did not complete`);
 
 			// RESULT (in case of error)
 			// {
@@ -80,7 +89,6 @@ function send(pushTokens, message, payload, sound){
 			//   canonical_ids: 0,
 			//   results: [ { error: 'NotRegistered' } ]
 			// }
-
 			resolve(result);
 		});
 	})
@@ -98,12 +106,15 @@ function send(pushTokens, message, payload, sound){
 
 		const {successful, failed} = results.reduce((prev, result) => {
 			// puchToken cleanup
-			if(result.registration_id)
+			if(result.registration_id){
 				tokensToUpdate.push({from: result.token, to: result.registration_id});
-			else if(result.error === 'InvalidRegistration' || result.error === 'NotRegistered')
+			}
+			else if(result.error === 'InvalidRegistration' || result.error === 'NotRegistered'){
 				tokensToRemove.push(result.token);
-			else if(result.error === 'MismatchSenderId')
-				throw new Error("FCM ERROR: Your Sender ID appears to be invalid");
+			}
+			else if(result.error === 'MismatchSenderId'){
+				console.error("FCM ERROR: Your Sender ID appears to be invalid");
+			}
 
 			// count failures
 			if(result.error) prev.failed++;

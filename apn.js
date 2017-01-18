@@ -13,18 +13,15 @@ var apnFeedback;
 
 var handlers = [];
 
-function init(certFile, keyFile, production, defaultValues = {}){
+function init(certFile, keyFile, production, {timetoLive, concurrency, iosSound}){
 	if(!certFile) throw new Error("An APN certificate file is needed");
 	else if(!keyFile) throw new Error("An APN key file is needed");
 	else if(!fs.existsSync(certFile)) throw new Error("The provided APN certificate file does not exist");
 	else if(!fs.existsSync(keyFile)) throw new Error("The provided APN key file does not exist");
 
-	if(defaultValues.timetoLive)
-		defaults.timetoLive = Math.max(defaultValues.timetoLive, 60 * 60); // min 1h
-	if(defaultValues.concurrency)
-		defaults.concurrency = defaultValues.concurrency;
-	if(defaultValues.iosSound)
-		defaults.sound = defaultValues.iosSound;
+	if(timetoLive) defaults.timetoLive = Math.max(timetoLive, 60 * 60); // min 1h
+	if(concurrency) defaults.concurrency = concurrency;
+	if(iosSound) defaults.sound = iosSound;
 
 	var apnConfig = {
 		// buffersNotifications:true,

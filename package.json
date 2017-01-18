@@ -1,6 +1,6 @@
 {
   "name": "tiny-push",
-  "version": "1.0.4",
+  "version": "2.0.0",
   "description": "Delivering push notifications made simple and straightforward",
   "main": "index.js",
   "scripts": {
@@ -16,7 +16,8 @@
     "notification",
     "android",
     "ios",
-    "iphone"
+    "iphone",
+    "tvrbo"
   ],
   "author": "Jordi Moraleda <jordi@tvrbo.pro>",
   "license": "ISC",

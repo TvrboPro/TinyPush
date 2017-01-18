@@ -15,10 +15,11 @@ var defaults = {
 
 function init(){
 	const keys = {
-		gcmKey: "__YOUR_GCM_KEY_HERE__",
+		fcmKey: "__YOUR_FCM_KEY_HERE__",
+		// gcmKey: "__YOUR_GCM_KEY_HERE__",
 		apnCertFile: "/path/to/apn.p12",
 		apnKeyFile: "/path/to/apn-key.p12",  // both may be in the same file
-		production: true                     // false will use the sandbox mode
+		apnProduction: true                  // false will use the sandbox mode
 	};
 
 	push.init(keys);
@@ -35,8 +36,9 @@ function init(){
 	cleanSubmissions();
 
 	// FEEDBACK
-	push.android.onFeedback(onDeviceError);
-	push.ios.onFeedback(onDeviceError);
+	push.fcm.onFeedback(onDeviceError);
+	push.gcm.onFeedback(onDeviceError);
+	push.apn.onFeedback(onDeviceError);
 }
 
 ////////////////////////////
@@ -65,7 +67,7 @@ function deliverSubmission(submission, messages){
 				switch(message.platform){
 					case 'android':
 					case 'Android':
-						return push.android.send([message.pushToken], submission.message, payload)
+						return push.fcm.send([message.pushToken], submission.message, payload)
 						.then(res => {
 							if(res.failures) {
 								return Message.findByIdAndUpdate(message._id, {sent: null, error: new Date(), retries: 0}).exec();
@@ -81,7 +83,7 @@ function deliverSubmission(submission, messages){
 					case 'iPhone':
 					case 'ios':
 					case 'iOS':
-						return push.ios.send([message.pushToken], submission.message, payload)
+						return push.apn.send([message.pushToken], submission.message, payload)
 						.then(() =>
 							Message.findByIdAndUpdate(message._id, {sent: new Date(), error: null}).lean().exec()
 						)

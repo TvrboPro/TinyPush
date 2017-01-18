@@ -2,10 +2,10 @@ var push = require('../index.js');
 
 // INIT
 
-const gcmKey = "YOUR_GCM_KEY_HERE"
+const fcmKey = "YOUR_FCM_KEY_HERE"
 const keyFile = '/path/to/apn.pem'
 
-push.init({gcmKey, apnCertFile: keyFile, apnKeyFile: keyFile, production: true})
+push.init({fcmKey, apnCertFile: keyFile, apnKeyFile: keyFile, apnProduction: true})
 
 
 // SAMPLE DATA
@@ -28,8 +28,9 @@ const recipients = [
 
 // FEEDBACK
 
-push.android.onFeedback(gotFeedback);
-push.ios.onFeedback(gotFeedback);
+push.fcm.onFeedback(gotFeedback);
+push.gcm.onFeedback(gotFeedback);
+push.apn.onFeedback(gotFeedback);
 
 // HANDLER
 
@@ -59,7 +60,7 @@ function gotFeedback(tokensToUpdate, tokensToRemove){
 
 push.batch(recipients, message, payload).then(console.log).catch(console.error);
 
-push.android.send([recipients[1].token], message, payload)
+push.fcm.send([recipients[1].token], message, payload)
 .then(res => {
 	console.log(res); // would log: [ { successful: 1, failed: 0 } ]
 })
@@ -67,7 +68,15 @@ push.android.send([recipients[1].token], message, payload)
 	console.error(err); // Unable to connect
 });
 
-push.ios.send([recipients[0].token], message, payload, [recipients[0].unread], 'default', 60 * 60 * 24)
+push.gcm.send([recipients[1].token], message, payload)
+.then(res => {
+	console.log(res); // would do nothing, as gcmKey was not provided
+})
+.catch(err => {
+	console.error(err); // Unable to connect
+});
+
+push.apn.send([recipients[0].token], message, payload, [recipients[0].unread], 'default', 60 * 60 * 24)
 .then(res => {
 	console.log(res); // would log: [ { successful: 1, failed: 0 } ]
 })

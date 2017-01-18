@@ -1,19 +1,36 @@
 var Promise = require('bluebird');
 
-var gcmPush = require('./android');
-var apnPush = require('./ios');
+var fcmPush = require('./fcm');
+var gcmPush = require('./gcm');
+var apnPush = require('./apn');
+
+var useAPN = false;
+var useFCM = false;
+var useGCM = false;
 
 var defaults = {
 	concurrency: 50
 };
 
-function init(keys = {}, defaultValues = {}){
+function init({fcmKey, gcmKey, apnCertFile, apnKeyFile, apnProduction}, defaultValues = {}){
 	if(defaultValues.concurrency)
 		defaults.concurrency = defaultValues.concurrency;
 
 	// platforms
-	gcmPush.init(keys.gcmKey, defaultValues);
-	apnPush.init(keys.apnCertFile, keys.apnKeyFile, keys.production, defaultValues);
+
+	if(fcmKey) {
+		fcmPush.init(fcmKey, defaultValues);
+		useFCM = true;
+	}
+	else if(gcmKey) {   // GCM is ignored when FCM is ON
+		gcmPush.init(gcmKey, defaultValues);
+		useGCM = true;
+	}
+
+	if(apnCertFile && apnKeyFile) {
+		apnPush.init(apnCertFile, apnKeyFile, apnProduction, defaultValues);
+		useAPN = true;
+	}
 
 	console.log((new Date()).toJSON(), "| The push notifications service is set up");
 }
@@ -22,34 +39,45 @@ function init(keys = {}, defaultValues = {}){
 
 function batch(recipients, message, payload){
 	return Promise.map(recipients, recipient => {
-			if(!recipient) return;
-			let newPayload = Object.assign({}, payload);
+		if(!recipient) return;
+		let newPayload = Object.assign({}, payload);
 
-			switch(recipient.platform){
-				case 'android':
-				case 'Android':
+		switch(recipient.platform){
+			case 'android':
+			case 'Android':
+				if(useFCM)
+					return fcmPush.send(recipient.token, message, newPayload);
+				else if(useGCM)
 					return gcmPush.send(recipient.token, message, newPayload);
+				else
+					break;
 
-				case 'iphone':
-				case 'iPhone':
-				case 'ios':
-				case 'iOS':
+			case 'iphone':
+			case 'iPhone':
+			case 'ios':
+			case 'iOS':
+				if(useAPN)
 					return apnPush.sendOne(recipient.token, message, newPayload, recipient.unread);
+				else
+					break;
+		}
+		throw new Error('The recipient\'s platform is not supported:', recipient.platform);
 
-				default:
-					throw new Error('The recipient\'s platform is not supported:', recipient.platform);
-			}
 	}, {concurrency: defaults.concurrency});
 }
 
 module.exports = {
 	init,
 	batch,
-	android: {
+	fcm: {
+		send: fcmPush.send,
+		onFeedback: fcmPush.onFeedback
+	},
+	gcm: {
 		send: gcmPush.send,
 		onFeedback: gcmPush.onFeedback
 	},
-	ios: {
+	apn: {
 		send: apnPush.send,
 		onFeedback: apnPush.onFeedback
 	}

@@ -1,7 +1,7 @@
 var Promise = require('bluebird');
-var gcm = require("node-gcm");
+var FCM = require("fcm-node");
 var zip = require('lodash.zip');
-var gcmConnection;
+var fcmConnection;
 
 var defaults = {
 	appName: 'TinyPush',
@@ -15,65 +15,58 @@ var defaults = {
 var handlers = [];
 
 
-function init(gcmKey, defaultValues = {}){
-	if(!gcmKey) throw new Error("The provided GCM KEY is empty");
+function init(fcmKey, {appName, retryCount, delayWhileIdle, simulate, concurrency, androidSound}){
+	if(!fcmKey) throw new Error("The provided FCM KEY is empty");
 
-	if(defaultValues.appName)
-		defaults.appName = defaultValues.appName;
-	if(defaultValues.retryCount)
-		defaults.retryCount = defaultValues.retryCount;
-	if(defaultValues.delayWhileIdle)
-		defaults.delayWhileIdle = defaultValues.delayWhileIdle;
-	if(defaultValues.simulate)
-		defaults.simulate = defaultValues.simulate;
-	if(defaultValues.concurrency)
-		defaults.concurrency = defaultValues.concurrency;
-	if(defaultValues.androidSound)
-		defaults.sound = defaultValues.androidSound;
+	if(appName) defaults.appName = appName;
+	if(retryCount) defaults.retryCount = retryCount;
+	if(delayWhileIdle) defaults.delayWhileIdle = delayWhileIdle;
+	if(simulate) defaults.simulate = simulate;
+	if(concurrency) defaults.concurrency = concurrency;
+	if(androidSound) defaults.sound = androidSound;
 
-	gcmConnection = new gcm.Sender(gcmKey);
+	fcmConnection = new FCM(fcmKey);
 }
 
 function send(pushTokens, message, payload, sound){
-	if(!gcmConnection)
-		return Promise.reject(new Error("The Android notification system is not configured yet"));
+	if(!fcmConnection)
+		return Promise.reject(new Error("The FCM notification system is not configured yet"));
 	else if(!pushTokens)
 		return Promise.resolve([]);
 	else if(typeof pushTokens == 'object' && !pushTokens.length)
 		return Promise.resolve([]);
 	else if(pushTokens.length > 1000)
-		return Promise.reject(new Error("The amount of recipients exceeds the maximum allowed on Android (1000)"));
-
-	if(typeof pushTokens == 'string') {
-		pushTokens = [ pushTokens ];
-	}
-	if(typeof payload.msgcnt == 'undefined') {
-		payload.msgcnt = '0';
-	}
-	if(typeof payload.message == 'undefined') {
-		payload.message = message || "";
-	}
-	if(typeof payload['content-available'] == 'undefined') {
-		payload['content-available'] = '1';
-	}
+		return Promise.reject(new Error("The amount of recipients exceeds the maximum allowed on FCM (1000)"));
 
 	return new Promise((resolve, reject) => {
 		var msg = {
 			delayWhileIdle: defaults.delayWhileIdle,
 			collapseKey: message || "(no message)", // group identical
-			timeToLive: 60 * 60 * 24 * 28, // 4 weeks
-			dryRun: defaults.simulate,
-			notification: {
+			content_available: true,   // wake IOS app
+			priority: 'normal',
+			timeToLive: 60 * 60 * 24 * 7 * 2, // 2 weeks
+			dryRun: defaults.simulate
+		};
+		if(typeof pushTokens == 'string') {
+			msg.to = pushTokens;
+		}
+		else {
+			msg.registration_ids = pushTokens;
+		}
+		if(message) {
+			msg.notification = {
 				title: defaults.appName,
 				body: message,
 				icon: "ic_launcher",
 				sound: sound || defaults.sound
-			},
-			data: payload || {}
-		};
+			}
+		}
+		if(payload){
+			msg.data = payload;
+		}
 
 		// delivery
-		gcmConnection.send(new gcm.Message(msg), {registrationTokens: pushTokens}, defaults.retryCount, (err, result) => {
+		fcmConnection.send(msg, (err, result) => {
 			if(err) return reject(err || `The android notification to ${pushTokens} did not complete`);
 
 			// RESULT (in case of error)
@@ -88,11 +81,11 @@ function send(pushTokens, message, payload, sound){
 			resolve(result);
 		});
 	})
-	.then(res => {
-		if(!res) return;
+	.then(response => {
+		if(!response) return;
 
 		// regrouping like [ [resultObj1, tokenStr1], [resultObj2, tokenStr2], ... ]
-		const groupedResults = zip(res.results, pushTokens);
+		const groupedResults = zip(response.results, pushTokens);
 
 		// map like { ...result, token: "..." }
 		return groupedResults.map(tuple => Object.assign({}, tuple[0], {token: tuple[1]}) );
@@ -107,7 +100,7 @@ function send(pushTokens, message, payload, sound){
 			else if(result.error === 'InvalidRegistration' || result.error === 'NotRegistered')
 				tokensToRemove.push(result.token);
 			else if(result.error === 'MismatchSenderId')
-				throw new Error("GCM ERROR: Your Sender ID appears to be invalid");
+				throw new Error("FCM ERROR: Your Sender ID appears to be invalid");
 
 			// count failures
 			if(result.error) prev.failed++;
